@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Pair Programmer Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2d2d30;
+            padding: 1rem;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .header h1 {
+            color: #569cd6;
+            font-size: 1.5rem;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #3e3e42;
+        }
+
+        .editor-header {
+            background: #2d2d30;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .language-select {
+            background: #3c3c3c;
+            color: #d4d4d4;
+            border: 1px solid #5a5a5a;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+        }
+
+        .editor {
+            flex: 1;
+            background: #1e1e1e;
+            border: none;
+            outline: none;
+            color: #d4d4d4;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 1rem;
+            resize: none;
+            tab-size: 2;
+        }
+
+        .suggestions-panel {
+            width: 400px;
+            min-width: 200px;
+            max-width: 80%;
+            background: #252526;
+            border-left: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .resize-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: transparent;
+            cursor: col-resize;
+            z-index: 10;
+        }
+
+        .resize-handle:hover {
+            background: #569cd6;
+        }
+
+        .resize-handle:active {
+            background: #4fc3f7;
+        }
+
+        .suggestions-header {
+            background: #2d2d30;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #3e3e42;
+            font-weight: bold;
+        }
+
+        .suggestions-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .suggestion-item {
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: #37373d;
+            border-color: #569cd6;
+        }
+
+        .suggestion-item.selected {
+            background: #264f78;
+            border-color: #569cd6;
+        }
+
+        .suggestion-meta {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            color: #9cdcfe;
+        }
+
+        .suggestion-confidence {
+            background: #569cd6;
+            color: white;
+            padding: 0.1rem 0.3rem;
+            border-radius: 2px;
+            font-size: 0.7rem;
+        }
+
+        .suggestion-code {
+            background: #1e1e1e;
+            padding: 0.5rem;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .suggestion-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        .copy-btn {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+            transition: background-color 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #1177bb;
+        }
+
+        .copy-btn:active {
+            background: #0a4d7a;
+        }
+
+        .copy-btn.copied {
+            background: #4ec9b0;
+        }
+
+        .accept-btn {
+            background: #4ec9b0;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+            transition: background-color 0.2s;
+        }
+
+        .accept-btn:hover {
+            background: #5dd4b1;
+        }
+
+        .controls {
+            background: #2d2d30;
+            padding: 1rem;
+            border-top: 1px solid #3e3e42;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background: #1177bb;
+        }
+
+        .btn:disabled {
+            background: #5a5a5a;
+            cursor: not-allowed;
+        }
+
+        .status {
+            color: #9cdcfe;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            color: #ffcc02;
+        }
+
+        .error {
+            color: #f48771;
+        }
+
+        .success {
+            color: #4ec9b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 AI Pair Programmer</h1>
+    </div>
+
+    <div class="main-container">
+        <div class="editor-container">
+            <div class="editor-header">
+                <label>Language:</label>
+                <select class="language-select" id="languageSelect">
+                    <option value="javascript">JavaScript</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                </select>
+                
+                <label style="margin-left: 1rem;">AI Model:</label>
+                <select class="language-select" id="modelSelect">
+                    <option value="gpt-4o-mini">GPT-4o Mini (Fast & Free)</option>
+                    <option value="gpt-4o">GPT-4o (Advanced)</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    <option value="llama-3.1-sonar-large-128k-online">Llama 3.1 Sonar Large</option>
+                    <option value="llama-3.1-sonar-small-128k-online">Llama 3.1 Sonar Small</option>
+                    <option value="llama-3.1-70b-instruct">Llama 3.1 70B</option>
+                    <option value="llama-3.1-8b-instruct">Llama 3.1 8B</option>
+                    <option value="mixtral-8x7b-instruct">Mixtral 8x7B</option>
+                    <option value="mistral-7b-instruct">Mistral 7B</option>
+                </select>
+                
+                <span class="status" id="status">Ready</span>
+                <span class="status" id="aiProvider" style="margin-left: 1rem; color: #4ec9b0;">🆓 Puter AI</span>
+            </div>
+            <textarea 
+                class="editor" 
+                id="codeEditor" 
+                placeholder="🚀 AI Pair Programmer with English-to-Code Conversion!&#10;&#10;💡 Try these examples:&#10;&#10;📝 Code Completion:&#10;- function calculateSum(&#10;- class UserManager {&#10;- const users = data.filter(&#10;&#10;🗣️ English to Code (NEW!):&#10;- // create a function that adds two numbers&#10;- // loop through an array and print each item&#10;- // validate user input and throw error if invalid&#10;- // create a class for managing users&#10;- // async function to fetch data from API&#10;&#10;🐍 Python Examples:&#10;- # create a function that calculates fibonacci&#10;- # read a file and return its contents&#10;- # sort a list of dictionaries by key&#10;&#10;Just type in plain English and watch it convert to code! ✨"
+            ></textarea>
+        </div>
+
+        <div class="suggestions-panel" id="suggestionsPanel">
+            <div class="resize-handle" id="resizeHandle"></div>
+            <div class="suggestions-header">
+                💡 AI Suggestions
+            </div>
+            <div class="suggestions-list" id="suggestionsList">
+                <div style="text-align: center; color: #9cdcfe; margin-top: 2rem;">
+                    Start typing to see AI suggestions
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="getSuggestionsBtn">Get Suggestions</button>
+        <button class="btn" id="clearBtn">Clear</button>
+        <span class="status" id="connectionStatus">Connecting...</span>
+    </div>
+
+    <script src="https://js.puter.com/v2/"></script>
+    <script src="app.js"></script>
+</body>
+</html>
